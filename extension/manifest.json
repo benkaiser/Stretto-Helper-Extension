@@ -1,11 +1,9 @@
 {
-    "name": "Youtube to MP3",
+    "name": "Youtube Audio Extractor",
     "version": "1.0",
     "permissions": [
         "background",
-        "downloads",
-        "*://*.googlevideo.com/*",
-        "https://siasky.net/*"
+        "*://*.youtube.com/*"
     ],
     "icons": {
         "16": "icon16.png",
@@ -16,10 +14,18 @@
         "scripts": ["background.js"],
         "persistent": false
     },
+    "externally_connectable": {
+        "matches": [
+            "http://localhost/*",
+            "https://next.kaiserapps.com/*"
+        ]
+    },
     "content_scripts": [
         {
-            "matches": ["https://*.youtube.com/*"],
-            "css": ["main.css"],
+            "matches": [
+                "https://next.kaiserapps.com/*",
+                "http://localhost:3000/*"
+            ],
             "js": ["content.js"]
         }
     ],
