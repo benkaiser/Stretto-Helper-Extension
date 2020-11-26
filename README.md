@@ -1,20 +1,17 @@
-# Youtube to MP3
-## Powered by [react-native-ytdl](https://github.com/AbelTesfaye/react-native-ytdl), [ffmpeg.js](https://github.com/Kagami/ffmpeg.js/) and [Sia SkyNet](https://siasky.net/)
+# Youtube Audio Fetcher
+## Get youtube URLs from the extension context
 
-Most other youtube to mp3 services rely on an external server to do the conversion. This processing is costly and results in ad-filled experiences with lots of waiting and generally risky procedures.
-
-This extension combats that by doing the downloading and conversion from youtube formats to mp3 locally in the browser.
-Once converted, these files are backed up with [Sia SkyNet](https://siasky.net/) so future downloads are faster for everyone.
+Since youtube scraping cannot happen within the context of a page even with cross-origin headers added, this extension is needed to pull the requests out of a webpage context.
 
 ## Installation
 
-1. [Download a copy of this repo](https://github.com/benkaiser/youtube-to-mp3/archive/master.zip)
-2. Unzip the repo
+1. [Download the extension folder from this repo](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/benkaiser/youtube-audio-fetcher/tree/master/extension)
+2. Unzip the extension folder
 3. Go to chrome://extensions in Chrome
 4. Toggle the "Developer Mode" in the top right corner
 5. Click "Load unpacked"
-6. Select the "extension" folder in the unzipped repo
-7. Visit any youtube page and click "Download MP3" next to the subscribe button
+6. Select the unzipped extension folder
+7. Use stretto with superpower now
 
 ## Building
 
