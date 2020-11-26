@@ -7,6 +7,10 @@ chrome.runtime.onMessageExternal.addListener((message: any, _: any, sendResponse
       let format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
       console.log('Format found!', format);
       sendResponse(format);
+    })
+    .catch((error: Error) => {
+      console.log(error);
+      sendResponse(null);
     });
   }
 });

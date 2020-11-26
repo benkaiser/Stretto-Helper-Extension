@@ -4346,6 +4346,10 @@ chrome.runtime.onMessageExternal.addListener((message, _, sendResponse) => {
             let format = react_native_ytdl_1.default.chooseFormat(info.formats, { quality: 'highestaudio' });
             console.log('Format found!', format);
             sendResponse(format);
+        })
+            .catch((error) => {
+            console.log(error);
+            sendResponse(null);
         });
     }
 });
