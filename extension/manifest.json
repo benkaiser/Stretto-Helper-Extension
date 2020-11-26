@@ -1,8 +1,12 @@
 {
-    "name": "Youtube Audio Extractor",
+    "name": "Stretto Helper",
     "version": "1.0",
     "permissions": [
         "background",
+        "webRequest",
+        "webRequestBlocking",
+        "*://*.localhost/*",
+        "*://next.kaiserapps.com/*",
         "*://*.youtube.com/*"
     ],
     "icons": {
@@ -12,7 +16,7 @@
     },
     "background": {
         "scripts": ["background.js"],
-        "persistent": false
+        "persistent": true
     },
     "externally_connectable": {
         "matches": [

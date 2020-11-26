@@ -1,11 +1,15 @@
-# Youtube Audio Fetcher
-## Get youtube URLs from the extension context
+# Stretto Helper
+## Extension used to add extra functionality to the Stretto music player
 
-Since youtube scraping cannot happen within the context of a page even with cross-origin headers added, this extension is needed to pull the requests out of a webpage context.
+This extension serves two primary purposes:
+1. Fetch youtube stream urls
+2. Unblock all CORs requests from Stretto
+
+With these two, Stretto can successfully stream, cache offline, and do a bunch more processing on the client without a server for proxying requests.
 
 ## Installation
 
-1. [Download the extension folder from this repo](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/benkaiser/youtube-audio-fetcher/tree/master/extension)
+1. [Download the extension folder from this repo](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/benkaiser/Stretto-Helper-Extension/tree/master/extension)
 2. Unzip the extension folder
 3. Go to chrome://extensions in Chrome
 4. Toggle the "Developer Mode" in the top right corner
