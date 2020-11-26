@@ -5,8 +5,7 @@
         "background",
         "webRequest",
         "webRequestBlocking",
-        "*://*.localhost/*",
-        "*://next.kaiserapps.com/*",
+        "<all_urls>",
         "*://*.youtube.com/*"
     ],
     "icons": {

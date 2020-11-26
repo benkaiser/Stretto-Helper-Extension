@@ -4370,7 +4370,6 @@ const onHeadersReceived = (request) => {
     if (!interceptRequest(request.initiator)) {
         return { responseHeaders };
     }
-    console.log('Intercepted request', request);
     if (prefs['overwrite-origin'] === true) {
         const o = responseHeaders.find(({ name }) => name.toLowerCase() === 'access-control-allow-origin');
         if (o) {
