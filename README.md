@@ -9,15 +9,17 @@ With these two, Stretto can successfully stream, cache offline, and do a bunch m
 
 ## Installation
 
-1. [Download the extension folder from this repo](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/benkaiser/Stretto-Helper-Extension/tree/master/extension)
+1. [Download the extension folder from this repo](https://github.com/benkaiser/Stretto-Helper-Extension/raw/master/extension.zip)
 2. Unzip the extension folder
 3. Go to chrome://extensions in Chrome
 4. Toggle the "Developer Mode" in the top right corner
 5. Click "Load unpacked"
 6. Select the unzipped extension folder
-7. Use stretto with superpower now
+7. Reload Stretto
 
-## Building
+## For Develoeprs
+
+### Building
 
 Run these commands from the root of the repo:
 
@@ -28,6 +30,6 @@ npm start
 
 Then refresh the unpacked extension in chrome://extensions from the above installation steps.
 
-## License
+### License
 
 MIT
