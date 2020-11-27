@@ -33,8 +33,31 @@ function interceptRequest(initiator: string) {
   }
 }
 
+function isThisExtension(initiator: string) {
+  return initiator === `chrome-extension://${chrome.runtime.id}`;
+}
+
+const onBeforeSendHeaders = (request: any) => {
+  const requestHeaders = request.requestHeaders;
+
+  if (isThisExtension(request.initiator)) {
+    for (var i = 0; i < requestHeaders.length; ++i) {
+      if (requestHeaders[i].name === 'User-Agent') {
+        // drop mobile user-agent detection
+        requestHeaders[i].value = requestHeaders[i].value.replace('Android', '');
+      }
+      if (requestHeaders[i].name.toLowerCase() === 'x-youtube-identity-token') {
+        // drop mobile user-agent detection
+        requestHeaders[i].value = requestHeaders[i].value.replace('\\u003d', '=');
+      }
+    }
+  }
+  return { requestHeaders };
+}
+
 const onHeadersReceived = (request: any) => {
   const responseHeaders = request.responseHeaders;
+
   if (!interceptRequest(request.initiator)) {
     return { responseHeaders };
   }
@@ -107,14 +130,18 @@ const onHeadersReceived = (request: any) => {
   return { responseHeaders };
 };
 const remove = () => {
+  chrome.webRequest.onBeforeSendHeaders.removeListener(onBeforeSendHeaders);
   chrome.webRequest.onHeadersReceived.removeListener(onHeadersReceived);
 };
 const install = () => {
   remove();
-  const extra = ['blocking', 'responseHeaders'];
+  chrome.webRequest.onBeforeSendHeaders.addListener(onBeforeSendHeaders,
+    { urls: ['<all_urls>'] },
+    ['blocking', 'requestHeaders']
+  );
   chrome.webRequest.onHeadersReceived.addListener(onHeadersReceived, {
     urls: ['<all_urls>']
-  }, extra);
+  }, ['blocking', 'responseHeaders']);
 };
 
 install();
