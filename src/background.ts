@@ -12,6 +12,7 @@ chrome.runtime.onMessageExternal.addListener((message: any, _: any, sendResponse
       console.log(error);
       sendResponse(null);
     });
+    return true;
   }
 });
 

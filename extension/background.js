@@ -4409,6 +4409,7 @@ chrome.runtime.onMessageExternal.addListener((message, _, sendResponse) => {
             console.log(error);
             sendResponse(null);
         });
+        return true;
     }
 });
 const prefs = {
