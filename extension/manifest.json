@@ -29,6 +29,7 @@
                 "https://next.kaiserapps.com/*",
                 "http://localhost:3000/*"
             ],
+            "run_at": "document_start",
             "js": ["content.js"]
         }
     ],

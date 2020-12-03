@@ -907,7 +907,7 @@ miniget.MinigetError = class MinigetError extends Error {
     }
 }
 
-miniget.Defaults = {
+miniget.defaultOptions = {
     maxRedirects: 10,
     maxRetries: 5,
     maxReconnects: 0,
@@ -2504,6 +2504,9 @@ module.exports = class Cache extends Map {
     this.timeout = timeout;
   }
   set(key, value) {
+    if (this.has(key)) {
+      clearTimeout(super.get(key).tid);
+    }
     super.set(key, {
       tid: setTimeout(this.delete.bind(this, key), this.timeout),
       value,
@@ -2516,11 +2519,11 @@ module.exports = class Cache extends Map {
     }
     return null;
   }
-  async getOrSet(key, fn) {
+  getOrSet(key, fn) {
     if (this.has(key)) {
       return this.get(key);
     } else {
-      let value = await fn();
+      let value = fn();
       this.set(key, value);
       return value;
     }
@@ -3325,6 +3328,8 @@ const TITLE_TO_CATEGORY = {
   song: { name: 'Music', url: 'https://music.youtube.com/' },
 };
 
+const getText = obj => obj ? obj.runs ? obj.runs[0].text : obj.simpleText : null;
+
 
 /**
  * Get video media.
@@ -3350,10 +3355,10 @@ exports.getMedia = info => {
         .metadataRowContainerRenderer.rows;
     for (let row of metadataRows) {
       if (row.metadataRowRenderer) {
-        let title = row.metadataRowRenderer.title.simpleText.toLowerCase();
+        let title = getText(row.metadataRowRenderer.title).toLowerCase();
         let contents = row.metadataRowRenderer.contents[0];
+        media[title] = getText(contents);
         let runs = contents.runs;
-        media[title] = runs ? runs[0].text : contents.simpleText;
         if (runs && runs[0].navigationEndpoint) {
           media[`${title}_url`] = urllib.resolve(VIDEO_URL,
             runs[0].navigationEndpoint.commandMetadata.webCommandMetadata.url);
@@ -3368,9 +3373,9 @@ exports.getMedia = info => {
           .filter(meta => meta.richMetadataRenderer.style === 'RICH_METADATA_RENDERER_STYLE_BOX_ART');
         for (let { richMetadataRenderer } of boxArt) {
           let meta = richMetadataRenderer;
-          media.year = meta.subtitle.simpleText;
-          let type = meta.callToAction.simpleText.split(' ')[1];
-          media[type] = meta.title.simpleText;
+          media.year = getText(meta.subtitle);
+          let type = getText(meta.callToAction).split(' ')[1];
+          media[type] = getText(meta.title);
           media[`${type}_url`] = urllib.resolve(VIDEO_URL,
             meta.endpoint.commandMetadata.webCommandMetadata.url);
           media.thumbnails = meta.thumbnail.thumbnails;
@@ -3379,7 +3384,7 @@ exports.getMedia = info => {
           .filter(meta => meta.richMetadataRenderer.style === 'RICH_METADATA_RENDERER_STYLE_TOPIC');
         for (let { richMetadataRenderer } of topic) {
           let meta = richMetadataRenderer;
-          media.category = meta.title.simpleText;
+          media.category = getText(meta.title);
           media.category_url = urllib.resolve(VIDEO_URL,
             meta.endpoint.commandMetadata.webCommandMetadata.url);
         }
@@ -3392,6 +3397,10 @@ exports.getMedia = info => {
   return media;
 };
 
+
+const isVerified = badges => !!(badges && badges.find(b => b.metadataBadgeRenderer.tooltip === 'Verified'));
+
+
 /**
  * Get video author.
  *
@@ -3399,7 +3408,7 @@ exports.getMedia = info => {
  * @returns {Object}
  */
 exports.getAuthor = info => {
-  let channelId, avatar, subscriberCount, verified = false;
+  let channelId, thumbnails = [], subscriberCount, verified = false;
   try {
     let results = info.response.contents.twoColumnWatchNextResults.results.results.contents;
     let v = results.find(v2 =>
@@ -3408,27 +3417,31 @@ exports.getAuthor = info => {
       v2.videoSecondaryInfoRenderer.owner.videoOwnerRenderer);
     let videoOwnerRenderer = v.videoSecondaryInfoRenderer.owner.videoOwnerRenderer;
     channelId = videoOwnerRenderer.navigationEndpoint.browseEndpoint.browseId;
-    avatar = urllib.resolve(VIDEO_URL, videoOwnerRenderer.thumbnail.thumbnails[0].url);
-    subscriberCount = utils.parseAbbreviatedNumber(
-      videoOwnerRenderer.subscriberCountText.runs[0].text);
-    verified = !!videoOwnerRenderer.badges.find(b => b.metadataBadgeRenderer.tooltip === 'Verified');
+    thumbnails = videoOwnerRenderer.thumbnail.thumbnails.map(thumbnail => {
+      thumbnail.url = urllib.resolve(VIDEO_URL, thumbnail.url);
+      return thumbnail;
+    });
+    subscriberCount = utils.parseAbbreviatedNumber(getText(videoOwnerRenderer.subscriberCountText));
+    verified = isVerified(videoOwnerRenderer.badges);
   } catch (err) {
     // Do nothing.
   }
   try {
     let videoDetails = info.player_response.microformat.playerMicroformatRenderer;
     let id = videoDetails.channelId || channelId;
-    return {
+    let author = {
       id: id,
       name: videoDetails.ownerChannelName,
       user: videoDetails.ownerProfileUrl.split('/').slice(-1)[0],
       channel_url: `https://www.youtube.com/channel/${id}`,
       external_channel_url: `https://www.youtube.com/channel/${videoDetails.externalChannelId}`,
       user_url: urllib.resolve(VIDEO_URL, videoDetails.ownerProfileUrl),
-      avatar: avatar,
-      verified: verified,
+      thumbnails,
+      verified,
       subscriber_count: subscriberCount,
     };
+    utils.deprecate(author, 'avatar', author.thumbnails[0].url, 'author.avatar', 'author.thumbnails[0].url');
+    return author;
   } catch (err) {
     return {};
   }
@@ -3457,26 +3470,56 @@ exports.getRelatedVideos = info => {
     let details = result.compactVideoRenderer;
     if (details) {
       try {
-        let viewCount = details.viewCountText.simpleText;
-        let shortViewCount = details.shortViewCountText.simpleText;
+        let viewCount = getText(details.viewCountText);
+        let shortViewCount = getText(details.shortViewCountText);
         let rvsDetails = rvsParams.find(elem => elem.id === details.videoId);
         if (!/^\d/.test(shortViewCount)) {
           shortViewCount = (rvsDetails && rvsDetails.short_view_count_text) || '';
         }
         viewCount = (/^\d/.test(viewCount) ? viewCount : shortViewCount).split(' ')[0];
-        videos.push({
+        let browseEndpoint = details.shortBylineText.runs[0].navigationEndpoint.browseEndpoint;
+        let channelId = browseEndpoint.browseId;
+        let name = getText(details.shortBylineText);
+        let user = (browseEndpoint.canonicalBaseUrl || '').split('/').slice(-1)[0];
+        let video = {
           id: details.videoId,
-          title: details.title.simpleText,
-          author: details.shortBylineText.runs[0].text,
-          ucid: details.shortBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId,
-          author_thumbnail: details.channelThumbnail.thumbnails[0].url,
+          title: getText(details.title),
+          published: getText(details.publishedTimeText),
+          author: {
+            id: channelId,
+            name,
+            user,
+            channel_url: `https://www.youtube.com/channel/${channelId}`,
+            user_url: `https://www.youtube.com/user/${user}`,
+            thumbnails: details.channelThumbnail.thumbnails.map(thumbnail => {
+              thumbnail.url = urllib.resolve(VIDEO_URL, thumbnail.url);
+              return thumbnail;
+            }),
+            verified: isVerified(details.ownerBadges),
+
+            [Symbol.toPrimitive]() {
+              // eslint-disable-next-line no-console
+              console.warn(`\`relatedVideo.author\` will be removed in a near future release, ` +
+                `use \`relatedVideo.author.name\` instead.`);
+              return video.author.name;
+            },
+
+          },
           short_view_count_text: shortViewCount.split(' ')[0],
-          view_count: viewCount.replace(',', ''),
+          view_count: viewCount.replace(/,/g, ''),
           length_seconds: details.lengthText ?
-            Math.floor(parseTime.humanStr(details.lengthText.simpleText) / 1000) :
+            Math.floor(parseTime.humanStr(getText(details.lengthText)) / 1000) :
             rvsParams && `${rvsParams.length_seconds}`,
-          video_thumbnail: details.thumbnail.thumbnails[0].url,
-        });
+          thumbnails: details.thumbnail.thumbnails,
+          isLive: !!(details.badges && details.badges.find(b => b.metadataBadgeRenderer.label === 'LIVE NOW')),
+        };
+
+        utils.deprecate(video, 'author_thumbnail', video.author.thumbnails[0].url,
+          'relatedVideo.author_thumbnail', 'relatedVideo.author.thumbnails[0].url');
+        utils.deprecate(video, 'ucid', video.author.id, 'relatedVideo.ucid', 'relatedVideo.author.id');
+        utils.deprecate(video, 'video_thumbnail', video.thumbnails[0].url,
+          'relatedVideo.video_thumbnail', 'relatedVideo.thumbnails[0].url');
+        videos.push(video);
       } catch (err) {
         // Skip.
       }
@@ -3542,16 +3585,18 @@ const Cache = __webpack_require__(442);
 
 
 const VIDEO_URL = 'https://www.youtube.com/watch?v=';
-const EMBED_URL = 'https://www.youtube.com/embed/';
-const VIDEO_EURL = 'https://youtube.googleapis.com/v/';
-const INFO_HOST = 'www.youtube.com';
-const INFO_PATH = '/get_video_info';
 
 
 // Cached for storing basic/full info.
 exports.cache = new Cache();
 exports.cookieCache = new Cache(1000 * 60 * 60 * 24);
 exports.watchPageCache = new Cache();
+
+
+// Special error class used to determine if an error is unrecoverable,
+// as in, ytdl-core should not try again to fetch the video metadata.
+// In this case, the video is usually unavailable in some way.
+class UnrecoverableError extends Error {}
 
 
 /**
@@ -3562,38 +3607,17 @@ exports.watchPageCache = new Cache();
  * @returns {Promise<Object>}
 */
 exports.getBasicInfo = async(id, options) => {
-  const retryOptions = Object.assign({}, miniget.Defaults, options.requestOptions);
-  let info = await retryFn(getJSONWatchPage, [id, options], retryOptions);
-  let player_response =
-    (info.player && info.player.args && info.player.args.player_response) ||
-    info.player_response || info.playerResponse;
-  player_response = parseJSON('watch.json `player_response`', player_response);
-  let html5player = info.player && info.player.assets && info.player.assets.js;
-
-  let playErr = utils.playError(player_response, ['ERROR']);
-  let privateErr = privateVideoError(player_response);
-  if (playErr || privateErr) {
-    throw playErr || privateErr;
-  }
-
-  let age_restricted = false;
-  if (!player_response || (!player_response.streamingData && !isRental(player_response))) {
-    // If the video page doesn't work, maybe because it has mature content.
-    // and requires an account logged in to view, try the embed page.
-    let [embedded_player_response, embedbody] = await retryFn(getEmbedPage, [id, options], retryOptions);
-    player_response = embedded_player_response;
-    html5player = html5player || getHTML5player(embedbody);
-    age_restricted = true;
-  }
-
-  if (!player_response || (!player_response.streamingData && !isRental(player_response))) {
-    player_response = await retryFn(getVideoInfoPage, [id, options, info], retryOptions);
-  }
+  const retryOptions = Object.assign({}, miniget.defaultOptions, options.requestOptions);
+  const isValid = info =>
+    info.player_response && (info.player_response.streamingData || isRental(info.player_response));
+  let info = await pipeline([id, options], retryOptions, isValid, [
+    getJSONWatchPage,
+    getEmbedPage,
+    getVideoInfoPage,
+  ]);
 
   Object.assign(info, {
-    player_response,
-    html5player,
-    formats: parseFormats(player_response),
+    formats: parseFormats(info.player_response),
     related_videos: extras.getRelatedVideos(info),
   });
 
@@ -3603,7 +3627,6 @@ exports.getBasicInfo = async(id, options) => {
     media: extras.getMedia(info),
     likes: extras.getLikes(info),
     dislikes: extras.getDislikes(info),
-    age_restricted,
 
     // Give the standard link to the video.
     video_url: VIDEO_URL + id,
@@ -3616,12 +3639,11 @@ exports.getBasicInfo = async(id, options) => {
   return info;
 };
 
-
 const privateVideoError = player_response => {
   let playability = player_response.playabilityStatus;
   if (playability.status === 'LOGIN_REQUIRED' && playability.messages &&
     playability.messages.filter(m => /This is a private video/.test(m)).length) {
-    return Error(playability.reason || (playability.messages && playability.messages[0]));
+    return new UnrecoverableError(playability.reason || (playability.messages && playability.messages[0]));
   } else {
     return null;
   }
@@ -3634,8 +3656,7 @@ const isRental = player_response => {
 };
 
 
-const getWatchURL = (id, options) =>
-  `${VIDEO_URL + id}&hl=${options.lang || 'en'}&bpctr=${Math.ceil(Date.now() / 1000)}`;
+const getWatchURL = (id, options) => `${VIDEO_URL + id}&hl=${options.lang || 'en'}`;
 const getWatchPage = (id, options) => {
   const url = getWatchURL(id, options);
   return exports.watchPageCache.getOrSet(url, () => miniget(url, options.requestOptions).text());
@@ -3655,20 +3676,88 @@ const getIdentityToken = (id, options, key, throwIfNotFound) =>
     let page = await getWatchPage(id, options);
     let match = page.match(/(["'])ID_TOKEN\1[:,]\s?"([^"]+)"/);
     if (!match && throwIfNotFound) {
-      throw Error('Cookie header used in request, but unable to find YouTube identity token');
+      throw new UnrecoverableError('Cookie header used in request, but unable to find YouTube identity token');
     }
     return match && match[2];
   });
 
 
-const retryFn = async(fn, args, options) => {
+/**
+ * Goes through each endpoint in the pipeline, retrying on failure if the error is recoverable.
+ * If unable to succeed with one endpoint, moves onto the next one.
+ *
+ * @param {Array.<Object>} args
+ * @param {Object} retryOptions
+ * @param {Function} isValid
+ * @param {Array.<Function>} endpoints
+ * @returns {[Object, Object, Object]}
+ */
+const pipeline = async(args, retryOptions, isValid, endpoints) => {
+  let info;
+  for (let func of endpoints) {
+    try {
+      const newInfo = await retryFunc(func, args.concat([info]), retryOptions);
+      if (newInfo.player_response) {
+        newInfo.player_response.videoDetails = assign(
+          info && info.player_response && info.player_response.videoDetails,
+          newInfo.player_response.videoDetails);
+        newInfo.player_response = assign(info && info.player_response, newInfo.player_response);
+      }
+      info = assign(info, newInfo);
+      if (isValid(info)) {
+        break;
+      }
+    } catch (err) {
+      if (err instanceof UnrecoverableError || func === endpoints[endpoints.length - 1]) {
+        throw err;
+      }
+      // Unable to find video metadata... so try next endpoint.
+    }
+  }
+  return info;
+};
+
+
+/**
+ * Like Object.assign(), but ignores `null` and `undefined` from `source`.
+ *
+ * @param {Object} target
+ * @param {Object} source
+ * @returns {Object}
+ */
+const assign = (target, source) => {
+  if (!target || !source) { return target || source; }
+  for (let [key, value] of Object.entries(source)) {
+    if (value !== null && value !== undefined) {
+      target[key] = value;
+    }
+  }
+  return target;
+};
+
+
+/**
+ * Given a function, calls it with `args` until it's successful,
+ * or until it encounters an unrecoverable error.
+ * Currently, any error from miniget is considered unrecoverable. Errors such as
+ * too many redirects, invalid URL, status code 404, status code 502.
+ *
+ * @param {Function} func
+ * @param {Array.<Object>} args
+ * @param {Object} options
+ * @param {number} options.maxRetries
+ * @param {Object} options.backoff
+ * @param {number} options.backoff.inc
+ */
+const retryFunc = async(func, args, options) => {
   let currentTry = 0, result;
   while (currentTry <= options.maxRetries) {
     try {
-      result = await fn(...args);
+      result = await func(...args);
       break;
     } catch (err) {
-      if (err instanceof miniget.MinigetError || currentTry >= options.maxRetries) {
+      if (err instanceof UnrecoverableError ||
+        (err instanceof miniget.MinigetError && err.statusCode < 500) || currentTry >= options.maxRetries) {
         throw err;
       }
       let wait = Math.min(++currentTry * options.backoff.inc, options.backoff.max);
@@ -3691,6 +3780,14 @@ const parseJSON = (source, json) => {
       throw Error(`Error parsing ${source}: ${err.message}`);
     }
   }
+};
+
+
+const findPlayerResponse = (source, info) => {
+  const player_response = info && (
+    (info.player && info.player.args && info.player.args.player_response) ||
+    info.player_response || info.playerResponse || info.embedded_player_response);
+  return parseJSON(source, player_response);
 };
 
 
@@ -3724,26 +3821,52 @@ const getJSONWatchPage = async(id, options) => {
     throw Error('Unable to retrieve video metadata');
   }
   let info = parsedBody.reduce((part, curr) => Object.assign(curr, part), {});
+  info.player_response = findPlayerResponse('watch.json `player_response`', info);
+  info.player_response.videoDetails = Object.assign({}, info.player_response.videoDetails, { age_restricted: false });
+  info.html5player = info.player && info.player.assets && info.player.assets.js;
+
+  let playErr = utils.playError(info.player_response, ['ERROR'], UnrecoverableError);
+  let privateErr = privateVideoError(info.player_response);
+  if (playErr || privateErr) {
+    throw playErr || privateErr;
+  }
+
   return info;
 };
 
+
+/**
+ * If the video page doesn't work, maybe because it has mature content.
+ * and requires an account logged in to view, try the embed page.
+ *
+ * @param {string} id
+ * @param {Object} options
+ * @returns {string}
+ */
+const EMBED_URL = 'https://www.youtube.com/embed/';
 const getEmbedURL = (id, options) => `${EMBED_URL + id}?hl=${options.lang || 'en'}`;
-const getEmbedPage = async(id, options) => {
+const getEmbedPage = async(id, options, watchPageInfo) => {
   const embedUrl = getEmbedURL(id, options);
   let body = await miniget(embedUrl, options.requestOptions).text();
   let jsonStr = utils.between(body, /(['"])PLAYER_(CONFIG|VARS)\1:\s?/, '</script>');
-  let config;
   if (!jsonStr) {
     throw Error('Could not find player config');
   }
-  config = parseJSON('embed config', utils.cutAfterJSON(jsonStr));
-  let player_response = (config.args && (config.args.player_response || config.args.embedded_player_response)) ||
-    config.embedded_player_response;
-  return [parseJSON('embed `player_response`', player_response), body];
+  let config = parseJSON('embed config', utils.cutAfterJSON(jsonStr));
+  let info = config.args || config;
+  info.player_response = findPlayerResponse('embed `player_response`', info);
+  info.player_response.videoDetails = Object.assign({}, info.player_response.videoDetails, {
+    age_restricted: watchPageInfo && !!utils.playError(watchPageInfo.player_response, ['LOGIN_REQUIRED']),
+  });
+  info.html5player = getHTML5player(body);
+  return info;
 };
 
 
-const getVideoInfoPage = async(id, options, info) => {
+const INFO_HOST = 'www.youtube.com';
+const INFO_PATH = '/get_video_info';
+const VIDEO_EURL = 'https://youtube.googleapis.com/v/';
+const getVideoInfoPage = async(id, options) => {
   const url = urllib.format({
     protocol: 'https',
     host: INFO_HOST,
@@ -3754,12 +3877,12 @@ const getVideoInfoPage = async(id, options, info) => {
       ps: 'default',
       gl: 'US',
       hl: options.lang || 'en',
-      sts: info.sts,
     },
   });
-  let morebody = await miniget(url, options.requestOptions).text();
-  let moreinfo = querystring.parse(morebody);
-  return parseJSON('get_video_info `player_response`', moreinfo.player_response || info.playerResponse);
+  let body = await miniget(url, options.requestOptions).text();
+  let info = querystring.parse(body);
+  info.player_response = findPlayerResponse('get_video_info `player_response`', info);
+  return info;
 };
 
 
@@ -3884,17 +4007,18 @@ const getM3U8 = async(url, options) => {
 
 // Cache get info functions.
 // In case a user wants to get a video's info before downloading.
-for (let fnName of ['getBasicInfo', 'getInfo']) {
+for (let funcName of ['getBasicInfo', 'getInfo']) {
   /**
    * @param {string} link
    * @param {Object} options
    * @returns {Promise<Object>}
    */
-  const fn = exports[fnName];
-  exports[fnName] = (link, options = {}) => {
+  const func = exports[funcName];
+  exports[funcName] = (link, options = {}) => {
+    utils.checkForUpdates();
     let id = urlUtils.getVideoID(link);
-    const key = [fnName, id, options.lang].join('-');
-    return exports.cache.getOrSet(key, () => fn(id, options));
+    const key = [funcName, id, options.lang].join('-');
+    return exports.cache.getOrSet(key, () => func(id, options));
   };
 }
 
@@ -4266,7 +4390,10 @@ exports.validateURL = string => {
 /***/ }),
 
 /***/ 228:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+const miniget = __webpack_require__(83);
+
 
 /**
  * Extract string inbetween another.
@@ -4374,16 +4501,64 @@ exports.cutAfterJSON = mixedJson => {
  *
  * @param {Object} player_response
  * @param {Array.<string>} statuses
+ * @param {Error} ErrorType
  * @returns {!Error}
  */
-exports.playError = (player_response, statuses) => {
+exports.playError = (player_response, statuses, ErrorType = Error) => {
   let playability = player_response.playabilityStatus;
   if (playability && statuses.includes(playability.status)) {
-    return Error(playability.reason || (playability.messages && playability.messages[0]));
+    return new ErrorType(playability.reason || (playability.messages && playability.messages[0]));
   }
   return null;
 };
 
+
+/**
+ * Temporary helper to help deprecating a few properties.
+ *
+ * @param {Object} obj
+ * @param {string} prop
+ * @param {Object} value
+ * @param {string} oldPath
+ * @param {string} newPath
+ */
+exports.deprecate = (obj, prop, value, oldPath, newPath) => {
+  Object.defineProperty(obj, prop, {
+    get: () => {
+      // eslint-disable-next-line no-console
+      console.warn(`\`${oldPath}\` will be removed in a near future release, ` +
+        `use \`${newPath}\` instead.`);
+      return value;
+    },
+  });
+};
+
+
+// Check for updates.
+const { version } = __webpack_require__(573);
+exports.lastUpdateCheck = 0;
+exports.checkForUpdates = () => {
+  if (!process.env.YTDL_NO_UPDATE && Date.now() - exports.lastUpdateCheck >= 1000 * 60 * 60 * 12) {
+    exports.lastUpdateCheck = Date.now();
+    return miniget('https://api.github.com/repos/fent/node-ytdl-core/releases/latest', {
+      headers: { 'User-Agent': 'ytdl-core' },
+    }).text().then(response => {
+      if (JSON.parse(response).tag_name !== `v${version}`) {
+        console.warn('\x1b[33mWARNING:\x1B[0m ytdl-core is out of date! Update with "npm install ytdl-core@latest".');
+      }
+    });
+  }
+  return null;
+};
+
+
+/***/ }),
+
+/***/ 573:
+/***/ ((module) => {
+
+"use strict";
+module.exports = JSON.parse("{\"_args\":[[\"github:ytdl-js/react-native-ytdl\",\"C:\\\\Users\\\\bekaise.AUSTOWER\\\\git\\\\Stretto-Helper-Extension\"]],\"_from\":\"github:ytdl-js/react-native-ytdl\",\"_id\":\"react-native-ytdl@github:ytdl-js/react-native-ytdl#c9d56f3799cc3c09d105069ff366581b3d2d99e6\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:ytdl-js/react-native-ytdl\",\"rawSpec\":\"github:ytdl-js/react-native-ytdl\",\"saveSpec\":\"github:ytdl-js/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"/\"],\"_resolved\":\"github:ytdl-js/react-native-ytdl#c9d56f3799cc3c09d105069ff366581b3d2d99e6\",\"_spec\":\"github:ytdl-js/react-native-ytdl\",\"_where\":\"C:\\\\Users\\\\bekaise.AUSTOWER\\\\git\\\\Stretto-Helper-Extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"dependencies\":{\"querystring\":\"^0.2.0\",\"url\":\"~0.10.1\"},\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.1.0\"}");
 
 /***/ }),
 
