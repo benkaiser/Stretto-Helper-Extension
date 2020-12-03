@@ -52,6 +52,13 @@ const onBeforeSendHeaders = (request: any) => {
         requestHeaders[i].value = requestHeaders[i].value.replace('\\u003d', '=');
       }
     }
+  } else if (request.url.includes('https://www.youtube.com/')) {
+    for (var i = 0; i < requestHeaders.length; ++i) {
+      if (requestHeaders[i].name === 'User-Agent') {
+        // drop mobile user-agent detection
+        requestHeaders[i].value = requestHeaders[i].value.replace('Android', '').replace('Mobile', '');
+      }
+    }
   }
   return { requestHeaders };
 }
