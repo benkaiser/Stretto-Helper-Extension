@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 
 module.exports = {
   entry: {
@@ -14,6 +15,11 @@ module.exports = {
       },
     ],
   },
+  plugins: [
+    new webpack.ProvidePlugin({
+      process: path.resolve(path.join(__dirname, 'src/processMock'))
+    })
+  ],
   resolve: {
     extensions: [ '.tsx', '.ts', '.js' ],
   },
