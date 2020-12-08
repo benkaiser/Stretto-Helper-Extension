@@ -3438,7 +3438,7 @@ exports.getAuthor = info => {
   }
   try {
     let videoDetails = info.player_response.microformat && info.player_response.microformat.playerMicroformatRenderer;
-    let id = videoDetails ? videoDetails.channelId : channelId;
+    let id = (videoDetails && videoDetails.channelId) || channelId || info.player_response.videoDetails.channelId;
     let author = {
       id: id,
       name: videoDetails ? videoDetails.ownerChannelName : info.player_response.videoDetails.author,
@@ -3450,7 +3450,9 @@ exports.getAuthor = info => {
       verified,
       subscriber_count: subscriberCount,
     };
-    utils.deprecate(author, 'avatar', author.thumbnails[0].url, 'author.avatar', 'author.thumbnails[0].url');
+    if (thumbnails.length) {
+      utils.deprecate(author, 'avatar', author.thumbnails[0].url, 'author.avatar', 'author.thumbnails[0].url');
+    }
     return author;
   } catch (err) {
     return {};
@@ -3631,13 +3633,13 @@ exports.getBasicInfo = async(id, options) => {
     if (playErr || privateErr) {
       throw playErr || privateErr;
     }
-    return info && (
+    return info && info.player_response && (
       info.player_response.streamingData || isRental(info.player_response) || isNotYetBroadcasted(info.player_response)
     );
   };
   let info = await pipeline([id, options], validate, retryOptions, [
-    getJSONWatchPage,
-    getEmbedPage,
+    getWatchJSONPage,
+    getWatchHTMLPage,
     getVideoInfoPage,
   ]);
 
@@ -3660,8 +3662,9 @@ exports.getBasicInfo = async(id, options) => {
   };
 
   info.videoDetails = Object.assign({},
+    info.player_response && info.player_response.microformat &&
     info.player_response.microformat.playerMicroformatRenderer,
-    info.player_response.videoDetails, additional);
+    info.player_response && info.player_response.videoDetails, additional);
 
   return info;
 };
@@ -3731,10 +3734,12 @@ const pipeline = async(args, validate, retryOptions, endpoints) => {
   for (let func of endpoints) {
     try {
       const newInfo = await retryFunc(func, args.concat([info]), retryOptions);
-      newInfo.player_response.videoDetails = assign(
-        info && info.player_response && info.player_response.videoDetails,
-        newInfo.player_response.videoDetails);
-      newInfo.player_response = assign(info && info.player_response, newInfo.player_response);
+      if (newInfo.player_response) {
+        newInfo.player_response.videoDetails = assign(
+          info && info.player_response && info.player_response.videoDetails,
+          newInfo.player_response.videoDetails);
+        newInfo.player_response = assign(info && info.player_response, newInfo.player_response);
+      }
       info = assign(info, newInfo);
       if (validate(info, false)) {
         break;
@@ -3801,7 +3806,7 @@ const retryFunc = async(func, args, options) => {
 
 
 const jsonClosingChars = /^[)\]}'\s]+/;
-const parseJSON = (source, json) => {
+const parseJSON = (source, varName, json) => {
   if (!json || typeof json === 'object') {
     return json;
   } else {
@@ -3809,27 +3814,36 @@ const parseJSON = (source, json) => {
       json = json.replace(jsonClosingChars, '');
       return JSON.parse(json);
     } catch (err) {
-      throw Error(`Error parsing ${source}: ${err.message}`);
+      throw Error(`Error parsing ${varName} in ${source}: ${err.message}`);
     }
   }
 };
 
 
+const findJSON = (source, varName, body, left, right, prependJSON = '') => {
+  let jsonStr = utils.between(body, left, right);
+  if (!jsonStr) {
+    throw Error(`Could not find ${varName} in ${source}`);
+  }
+  return parseJSON(source, varName, utils.cutAfterJSON(`${prependJSON}${jsonStr}`));
+};
+
+
 const findPlayerResponse = (source, info) => {
   const player_response = info && (
-    (info.player && info.player.args && info.player.args.player_response) ||
+    (info.args && info.args.player_response) ||
     info.player_response || info.playerResponse || info.embedded_player_response);
-  return parseJSON(source, player_response);
+  return parseJSON(source, 'player_response', player_response);
 };
 
 
 const getWatchJSONURL = (id, options) => `${getHTMLWatchURL(id, options)}&pbj=1`;
-const getJSONWatchPage = async(id, options) => {
+const getWatchJSONPage = async(id, options) => {
   const reqOptions = Object.assign({ headers: {} }, options.requestOptions);
   let cookie = reqOptions.headers.Cookie || reqOptions.headers.cookie;
   reqOptions.headers = Object.assign({
     'x-youtube-client-name': '1',
-    'x-youtube-client-version': '2.20201117.05.00',
+    'x-youtube-client-version': '2.20201203.06.00',
     'x-youtube-identity-token': exports.cookieCache.get(cookie || 'browser') || '',
   }, reqOptions.headers);
 
@@ -3844,8 +3858,7 @@ const getJSONWatchPage = async(id, options) => {
 
   const jsonUrl = getWatchJSONURL(id, options);
   let body = await miniget(jsonUrl, reqOptions).text();
-  let parsedBody;
-  parsedBody = parseJSON('watch.json', body);
+  let parsedBody = parseJSON('watch.json', 'body', body);
   if (parsedBody.reload === 'now') {
     await setIdentityToken('browser', false);
   }
@@ -3853,33 +3866,24 @@ const getJSONWatchPage = async(id, options) => {
     throw Error('Unable to retrieve video metadata in watch.json');
   }
   let info = parsedBody.reduce((part, curr) => Object.assign(curr, part), {});
-  info.player_response = findPlayerResponse('watch.json `player_response`', info);
+  info.player_response = findPlayerResponse('watch.json', info);
   info.html5player = info.player && info.player.assets && info.player.assets.js;
 
   return info;
 };
 
 
-/**
- * If the video page doesn't work, maybe because it has mature content.
- * and requires an account logged in to view, try the embed page.
- *
- * @param {string} id
- * @param {Object} options
- * @returns {string}
- */
-const EMBED_URL = 'https://www.youtube.com/embed/';
-const getEmbedURL = (id, options) => `${EMBED_URL + id}?hl=${options.lang || 'en'}`;
-const getEmbedPage = async(id, options) => {
-  const embedUrl = getEmbedURL(id, options);
-  let body = await miniget(embedUrl, options.requestOptions).text();
-  let configJson = utils.between(body, /(['"])PLAYER_(CONFIG|VARS)\1:\s?/, '</script>');
-  if (!configJson) {
-    throw Error('Could not find player config in embed.html');
+const getWatchHTMLPage = async(id, options) => {
+  let body = await getHTMLWatchPageBody(id, options);
+  let info = { page: 'watch' };
+  try {
+    info.player_response = findJSON('watch.html', 'player_response',
+      body, /\bytInitialPlayerResponse\s*=\s*\{/i, '\n', '{');
+  } catch (err) {
+    let args = findJSON('watch.html', 'player_response', body, /\bytplayer\.config\s*=\s*{/, '</script>', '{');
+    info.player_response = findPlayerResponse('watch.html', args);
   }
-  let config = parseJSON('embed config', utils.cutAfterJSON(configJson));
-  let info = config.args || config;
-  info.player_response = findPlayerResponse('embed `player_response`', info);
+  info.response = findJSON('watch.html', 'response', body, /\bytInitialData("\])?\s*=\s*\{/i, '\n', '{');
   info.html5player = getHTML5player(body);
   return info;
 };
@@ -3903,7 +3907,7 @@ const getVideoInfoPage = async(id, options) => {
   });
   let body = await miniget(url, options.requestOptions).text();
   let info = querystring.parse(body);
-  info.player_response = findPlayerResponse('get_video_info `player_response`', info);
+  info.player_response = findPlayerResponse('get_video_info', info);
   return info;
 };
 
@@ -3914,7 +3918,7 @@ const getVideoInfoPage = async(id, options) => {
  */
 const parseFormats = player_response => {
   let formats = [];
-  if (player_response.streamingData) {
+  if (player_response && player_response.streamingData) {
     formats = formats
       .concat(player_response.streamingData.formats || [])
       .concat(player_response.streamingData.adaptiveFormats || []);
@@ -4581,7 +4585,7 @@ exports.checkForUpdates = () => {
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse("{\"_from\":\"github:ytdl-js/react-native-ytdl\",\"_id\":\"react-native-ytdl@4.1.2\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:ytdl-js/react-native-ytdl\",\"rawSpec\":\"github:ytdl-js/react-native-ytdl\",\"saveSpec\":\"github:ytdl-js/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"github:ytdl-js/react-native-ytdl#212772b3d5551153fd55f3dc9f8af5761b6ef928\",\"_spec\":\"github:ytdl-js/react-native-ytdl\",\"_where\":\"C:\\\\Users\\\\bekaise.AUSTOWER\\\\git\\\\Stretto-Helper-Extension\\\\extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"bundleDependencies\":false,\"dependencies\":{\"querystring\":\"^0.2.0\",\"url\":\"~0.10.1\"},\"deprecated\":false,\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.1.2\"}");
+module.exports = JSON.parse("{\"_from\":\"github:ytdl-js/react-native-ytdl\",\"_id\":\"react-native-ytdl@4.1.4\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:ytdl-js/react-native-ytdl\",\"rawSpec\":\"github:ytdl-js/react-native-ytdl\",\"saveSpec\":\"github:ytdl-js/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"github:ytdl-js/react-native-ytdl#486591bfefc2715ed86acc0b5d4a83946838bbfe\",\"_spec\":\"github:ytdl-js/react-native-ytdl\",\"_where\":\"C:\\\\Users\\\\bekaise.AUSTOWER\\\\git\\\\Stretto-Helper-Extension\\\\extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"bundleDependencies\":false,\"dependencies\":{\"querystring\":\"^0.2.0\",\"url\":\"~0.10.1\"},\"deprecated\":false,\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.1.4\"}");
 
 /***/ }),
 
