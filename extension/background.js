@@ -4739,7 +4739,7 @@ const install = () => {
     chrome.webRequest.onBeforeSendHeaders.addListener(onBeforeSendHeaders, { urls: ['<all_urls>'] }, ['blocking', 'requestHeaders']);
     chrome.webRequest.onHeadersReceived.addListener(onHeadersReceived, {
         urls: ['<all_urls>']
-    }, ['blocking', 'responseHeaders']);
+    }, ['blocking', 'responseHeaders', 'extraHeaders']);
 };
 install();
 
