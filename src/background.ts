@@ -147,9 +147,13 @@ const install = () => {
     { urls: ['<all_urls>'] },
     ['blocking', 'requestHeaders']
   );
+  const headersRecievedOptions = ['blocking', 'responseHeaders'];
+  if (!navigator.userAgent.includes('Android')) {
+    headersRecievedOptions.push('extraHeaders');
+  }
   chrome.webRequest.onHeadersReceived.addListener(onHeadersReceived, {
     urls: ['<all_urls>']
-  }, ['blocking', 'responseHeaders', 'extraHeaders']);
+  }, headersRecievedOptions);
 };
 
 install();
