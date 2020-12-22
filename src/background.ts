@@ -45,7 +45,7 @@ const onBeforeSendHeaders = (request: any) => {
     for (var i = 0; i < requestHeaders.length; ++i) {
       if (requestHeaders[i].name === 'User-Agent') {
         // drop mobile user-agent detection
-        requestHeaders[i].value = requestHeaders[i].value.replace('Android', '');
+        requestHeaders[i].value = requestHeaders[i].value.replace('Android', '').replace('Mobile', '');
       }
       if (requestHeaders[i].name.toLowerCase() === 'x-youtube-identity-token') {
         // drop mobile user-agent detection
