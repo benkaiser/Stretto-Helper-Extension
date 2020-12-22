@@ -2504,8 +2504,29 @@ module.exports = __webpack_require__(37)
 
 /***/ }),
 
+/***/ 142:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const timers = {
+    setTimeout: function () {
+        const id = __webpack_require__.g.setTimeout(...arguments);
+
+        const ret = {
+            unref: () => id
+        }
+        return ret;
+    }
+};
+
+module.exports = timers
+
+
+/***/ }),
+
 /***/ 442:
-/***/ ((module) => {
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const { setTimeout } = __webpack_require__(142);
 
 // A cache that expires.
 module.exports = class Cache extends Map {
@@ -2518,7 +2539,7 @@ module.exports = class Cache extends Map {
       clearTimeout(super.get(key).tid);
     }
     super.set(key, {
-      tid: setTimeout(this.delete.bind(this, key), this.timeout),
+      tid: setTimeout(this.delete.bind(this, key), this.timeout).unref(),
       value,
     });
   }
@@ -2535,6 +2556,13 @@ module.exports = class Cache extends Map {
     } else {
       let value = fn();
       this.set(key, value);
+      (async() => {
+        try {
+          await value;
+        } catch (err) {
+          this.delete(key);
+        }
+      })();
       return value;
     }
   }
@@ -3510,7 +3538,6 @@ exports.getRelatedVideos = info => {
             verified: isVerified(details.ownerBadges),
 
             [Symbol.toPrimitive]() {
-              // eslint-disable-next-line no-console
               console.warn(`\`relatedVideo.author\` will be removed in a near future release, ` +
                 `use \`relatedVideo.author.name\` instead.`);
               return video.author.name;
@@ -3578,6 +3605,24 @@ exports.getDislikes = info => {
   }
 };
 
+/**
+ * Cleans up a few fields on `videoDetails`.
+ *
+ * @param {Object} videoDetails
+ * @returns {Object}
+ */
+exports.cleanVideoDetails = videoDetails => {
+  videoDetails.thumbnails = videoDetails.thumbnail.thumbnails;
+  delete videoDetails.thumbnail;
+  utils.deprecate(videoDetails, 'thumbnail', { thumbnails: videoDetails.thumbnails },
+    'videoDetails.thumbnail.thumbnails', 'videoDetails.thumbnails');
+  videoDetails.description = videoDetails.shortDescription || getText(videoDetails.description);
+  delete videoDetails.shortDescription;
+  utils.deprecate(videoDetails, 'shortDescription', videoDetails.description,
+    'videoDetails.shortDescription', 'videoDetails.description');
+  return videoDetails;
+};
+
 
 /***/ }),
 
@@ -3589,6 +3634,8 @@ const querystring = __webpack_require__(673);
 const sax = __webpack_require__(152);
 const miniget = __webpack_require__(83);
 const utils = __webpack_require__(228);
+// Forces Node JS version of setTimeout for Electron based applications
+const { setTimeout } = __webpack_require__(142);
 const formatUtils = __webpack_require__(900);
 const urlUtils = __webpack_require__(319);
 const extras = __webpack_require__(663);
@@ -3638,8 +3685,8 @@ exports.getBasicInfo = async(id, options) => {
     );
   };
   let info = await pipeline([id, options], validate, retryOptions, [
-    getWatchJSONPage,
     getWatchHTMLPage,
+    getWatchJSONPage,
     getVideoInfoPage,
   ]);
 
@@ -3661,10 +3708,10 @@ exports.getBasicInfo = async(id, options) => {
     video_url: VIDEO_URL + id,
   };
 
-  info.videoDetails = Object.assign({},
+  info.videoDetails = extras.cleanVideoDetails(Object.assign({},
     info.player_response && info.player_response.microformat &&
     info.player_response.microformat.playerMicroformatRenderer,
-    info.player_response && info.player_response.videoDetails, additional);
+    info.player_response && info.player_response.videoDetails, additional));
 
   return info;
 };
@@ -3693,10 +3740,17 @@ const isNotYetBroadcasted = player_response => {
 };
 
 
-const getHTMLWatchURL = (id, options) => `${VIDEO_URL + id}&hl=${options.lang || 'en'}`;
-const getHTMLWatchPageBody = (id, options) => {
-  const url = getHTMLWatchURL(id, options);
+const getWatchHTMLURL = (id, options) => `${VIDEO_URL + id}&hl=${options.lang || 'en'}`;
+const getWatchHTMLPageBody = (id, options) => {
+  const url = getWatchHTMLURL(id, options);
   return exports.watchPageCache.getOrSet(url, () => miniget(url, options.requestOptions).text());
+};
+
+
+const EMBED_URL = 'https://www.youtube.com/embed/';
+const getEmbedPageBody = (id, options) => {
+  const embedUrl = `${EMBED_URL + id}?hl=${options.lang || 'en'}`;
+  return miniget(embedUrl, options.requestOptions).text();
 };
 
 
@@ -3710,7 +3764,7 @@ const getHTML5player = body => {
 
 const getIdentityToken = (id, options, key, throwIfNotFound) =>
   exports.cookieCache.getOrSet(key, async() => {
-    let page = await getHTMLWatchPageBody(id, options);
+    let page = await getWatchHTMLPageBody(id, options);
     let match = page.match(/(["'])ID_TOKEN\1[:,]\s?"([^"]+)"/);
     if (!match && throwIfNotFound) {
       throw new UnrecoverableError('Cookie header used in request, but unable to find YouTube identity token');
@@ -3837,7 +3891,7 @@ const findPlayerResponse = (source, info) => {
 };
 
 
-const getWatchJSONURL = (id, options) => `${getHTMLWatchURL(id, options)}&pbj=1`;
+const getWatchJSONURL = (id, options) => `${getWatchHTMLURL(id, options)}&pbj=1`;
 const getWatchJSONPage = async(id, options) => {
   const reqOptions = Object.assign({ headers: {} }, options.requestOptions);
   let cookie = reqOptions.headers.Cookie || reqOptions.headers.cookie;
@@ -3874,7 +3928,7 @@ const getWatchJSONPage = async(id, options) => {
 
 
 const getWatchHTMLPage = async(id, options) => {
-  let body = await getHTMLWatchPageBody(id, options);
+  let body = await getWatchHTMLPageBody(id, options);
   let info = { page: 'watch' };
   try {
     info.player_response = findJSON('watch.html', 'player_response',
@@ -3943,7 +3997,8 @@ exports.getInfo = async(id, options) => {
     );
   let funcs = [];
   if (info.formats.length) {
-    info.html5player = info.html5player || getHTML5player(await getHTMLWatchPageBody(id, options));
+    info.html5player = info.html5player ||
+      getHTML5player(await getWatchHTMLPageBody(id, options)) || getHTML5player(await getEmbedPageBody(id, options));
     if (!info.html5player) {
       throw Error('Unable to find html5player file');
     }
@@ -4552,7 +4607,6 @@ exports.playError = (player_response, statuses, ErrorType = Error) => {
 exports.deprecate = (obj, prop, value, oldPath, newPath) => {
   Object.defineProperty(obj, prop, {
     get: () => {
-      // eslint-disable-next-line no-console
       console.warn(`\`${oldPath}\` will be removed in a near future release, ` +
         `use \`${newPath}\` instead.`);
       return value;
@@ -4562,15 +4616,16 @@ exports.deprecate = (obj, prop, value, oldPath, newPath) => {
 
 
 // Check for updates.
-const { version } = __webpack_require__(573);
+const packageJSON = __webpack_require__(573);
 exports.lastUpdateCheck = 0;
 exports.checkForUpdates = () => {
-  if (!process.env.YTDL_NO_UPDATE && Date.now() - exports.lastUpdateCheck >= 1000 * 60 * 60 * 12) {
+  if (!process.env.YTDL_NO_UPDATE && !packageJSON.version.startsWith('0.0.0-') &&
+    Date.now() - exports.lastUpdateCheck >= 1000 * 60 * 60 * 12) {
     exports.lastUpdateCheck = Date.now();
     return miniget('https://api.github.com/repos/fent/node-ytdl-core/releases/latest', {
       headers: { 'User-Agent': 'ytdl-core' },
     }).text().then(response => {
-      if (JSON.parse(response).tag_name !== `v${version}`) {
+      if (JSON.parse(response).tag_name !== `v${packageJSON.version}`) {
         console.warn("\u001b[33mWARNING:\u001b[0m react-native-ytdl is out of date! If the latest port is available, update with \"npm install react-native-ytdl@latest\".");
       }
     });
@@ -4585,7 +4640,7 @@ exports.checkForUpdates = () => {
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse("{\"_from\":\"github:ytdl-js/react-native-ytdl\",\"_id\":\"react-native-ytdl@4.1.4\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:ytdl-js/react-native-ytdl\",\"rawSpec\":\"github:ytdl-js/react-native-ytdl\",\"saveSpec\":\"github:ytdl-js/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"github:ytdl-js/react-native-ytdl#486591bfefc2715ed86acc0b5d4a83946838bbfe\",\"_spec\":\"github:ytdl-js/react-native-ytdl\",\"_where\":\"C:\\\\Users\\\\bekaise.AUSTOWER\\\\git\\\\Stretto-Helper-Extension\\\\extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"bundleDependencies\":false,\"dependencies\":{\"querystring\":\"^0.2.0\",\"url\":\"~0.10.1\"},\"deprecated\":false,\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.1.4\"}");
+module.exports = JSON.parse("{\"_from\":\"github:ytdl-js/react-native-ytdl\",\"_id\":\"react-native-ytdl@4.2.0\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:ytdl-js/react-native-ytdl\",\"rawSpec\":\"github:ytdl-js/react-native-ytdl\",\"saveSpec\":\"github:ytdl-js/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"github:ytdl-js/react-native-ytdl#457643ff5c98497c8064d38da53834a75b3084fd\",\"_spec\":\"github:ytdl-js/react-native-ytdl\",\"_where\":\"/home/benkaiser/HD/GIT/Stretto-Helper-Extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"bundleDependencies\":false,\"dependencies\":{\"querystring\":\"^0.2.0\",\"url\":\"~0.10.1\"},\"deprecated\":false,\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.2.0\"}");
 
 /***/ }),
 
