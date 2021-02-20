@@ -52,7 +52,7 @@ const onBeforeSendHeaders = (request: any) => {
         requestHeaders[i].value = requestHeaders[i].value.replace('\\u003d', '=');
       }
     }
-  } else if (request.url.includes('https://www.youtube.com/')) {
+  } else if (request.url.includes('https://www.youtube.com/') || request.url.includes('https://soundcloud.com/')) {
     for (var i = 0; i < requestHeaders.length; ++i) {
       if (requestHeaders[i].name === 'User-Agent') {
         // drop mobile user-agent detection

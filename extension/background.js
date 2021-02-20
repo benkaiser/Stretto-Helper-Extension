@@ -4616,16 +4616,16 @@ exports.deprecate = (obj, prop, value, oldPath, newPath) => {
 
 
 // Check for updates.
-const packageJSON = __webpack_require__(573);
+const pkg = __webpack_require__(573);
 exports.lastUpdateCheck = 0;
 exports.checkForUpdates = () => {
-  if (!process.env.YTDL_NO_UPDATE && !packageJSON.version.startsWith('0.0.0-') &&
+  if (!process.env.YTDL_NO_UPDATE && !pkg.version.startsWith('0.0.0-') &&
     Date.now() - exports.lastUpdateCheck >= 1000 * 60 * 60 * 12) {
     exports.lastUpdateCheck = Date.now();
     return miniget('https://api.github.com/repos/fent/node-ytdl-core/releases/latest', {
       headers: { 'User-Agent': 'ytdl-core' },
     }).text().then(response => {
-      if (JSON.parse(response).tag_name !== `v${packageJSON.version}`) {
+      if (JSON.parse(response).tag_name !== `v${pkg.version}`) {
         console.warn("\u001b[33mWARNING:\u001b[0m react-native-ytdl is out of date! If the latest port is available, update with \"npm install react-native-ytdl@latest\".");
       }
     });
@@ -4640,7 +4640,7 @@ exports.checkForUpdates = () => {
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse("{\"_from\":\"github:ytdl-js/react-native-ytdl\",\"_id\":\"react-native-ytdl@4.2.0\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:ytdl-js/react-native-ytdl\",\"rawSpec\":\"github:ytdl-js/react-native-ytdl\",\"saveSpec\":\"github:ytdl-js/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"github:ytdl-js/react-native-ytdl#457643ff5c98497c8064d38da53834a75b3084fd\",\"_spec\":\"github:ytdl-js/react-native-ytdl\",\"_where\":\"/home/benkaiser/HD/GIT/Stretto-Helper-Extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"bundleDependencies\":false,\"dependencies\":{\"querystring\":\"^0.2.0\",\"url\":\"~0.10.1\"},\"deprecated\":false,\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.2.0\"}");
+module.exports = JSON.parse("{\"_args\":[[\"github:ytdl-js/react-native-ytdl\",\"C:\\\\Users\\\\thebi\\\\git\\\\Stretto-Helper-Extension\"]],\"_from\":\"github:ytdl-js/react-native-ytdl\",\"_id\":\"react-native-ytdl@github:ytdl-js/react-native-ytdl#457643ff5c98497c8064d38da53834a75b3084fd\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:ytdl-js/react-native-ytdl\",\"rawSpec\":\"github:ytdl-js/react-native-ytdl\",\"saveSpec\":\"github:ytdl-js/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"/\"],\"_resolved\":\"github:ytdl-js/react-native-ytdl#457643ff5c98497c8064d38da53834a75b3084fd\",\"_spec\":\"github:ytdl-js/react-native-ytdl\",\"_where\":\"C:\\\\Users\\\\thebi\\\\git\\\\Stretto-Helper-Extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"dependencies\":{\"querystring\":\"^0.2.0\",\"url\":\"~0.10.1\"},\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.2.1\"}");
 
 /***/ }),
 
@@ -4702,7 +4702,7 @@ const onBeforeSendHeaders = (request) => {
             }
         }
     }
-    else if (request.url.includes('https://www.youtube.com/')) {
+    else if (request.url.includes('https://www.youtube.com/') || request.url.includes('https://soundcloud.com/')) {
         for (var i = 0; i < requestHeaders.length; ++i) {
             if (requestHeaders[i].name === 'User-Agent') {
                 // drop mobile user-agent detection
