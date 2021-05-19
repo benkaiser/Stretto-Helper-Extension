@@ -4688,6 +4688,7 @@ function interceptRequest(initiator) {
 function isThisExtension(initiator) {
     return initiator === `chrome-extension://${chrome.runtime.id}`;
 }
+const requestOriginMap = {};
 const onBeforeSendHeaders = (request) => {
     const requestHeaders = request.requestHeaders;
     if (isThisExtension(request.initiator)) {
@@ -4717,6 +4718,12 @@ const onHeadersReceived = (request) => {
     if (!interceptRequest(request.initiator)) {
         return { responseHeaders };
     }
+    if (request.statusCode === 302) {
+        const o = responseHeaders.find(({ name }) => name.toLowerCase() === 'location');
+        if (o) {
+            requestOriginMap[o.value] = 'null';
+        }
+    }
     if (prefs['overwrite-origin'] === true) {
         const o = responseHeaders.find(({ name }) => name.toLowerCase() === 'access-control-allow-origin');
         if (o) {
@@ -4725,8 +4732,11 @@ const onHeadersReceived = (request) => {
         else {
             responseHeaders.push({
                 'name': 'Access-Control-Allow-Origin',
-                'value': request.initiator
+                'value': requestOriginMap[request.url] || request.initiator
             });
+            if (requestOriginMap[request.url]) {
+                delete requestOriginMap[request.url];
+            }
         }
     }
     if (prefs.methods.length > 3) { // GET, POST, HEAD are mandatory
