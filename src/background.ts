@@ -52,6 +52,9 @@ const onBeforeSendHeaders = (request: any) => {
         // drop mobile user-agent detection
         requestHeaders[i].value = requestHeaders[i].value.replace('\\u003d', '=');
       }
+      if (requestHeaders[i].name === 'Sec-Fetch-Mode') {
+        requestHeaders[i].value = 'same-origin';
+      }
     }
   } else if (request.url.includes('https://www.youtube.com/') || request.url.includes('https://soundcloud.com/')) {
     for (var i = 0; i < requestHeaders.length; ++i) {
@@ -157,10 +160,7 @@ const install = () => {
     { urls: ['<all_urls>'] },
     ['blocking', 'requestHeaders']
   );
-  const headersRecievedOptions = ['blocking', 'responseHeaders'];
-  if (!navigator.userAgent.includes('Android')) {
-    headersRecievedOptions.push('extraHeaders');
-  }
+  const headersRecievedOptions = ['blocking', 'responseHeaders', 'extraHeaders'];
   chrome.webRequest.onHeadersReceived.addListener(onHeadersReceived, {
     urls: ['<all_urls>']
   }, headersRecievedOptions);

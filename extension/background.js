@@ -182,7 +182,7 @@ __webpack_require__.r(__webpack_exports__);
 
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
-  "default": () => /* binding */ react_native_ytdl
+  "default": () => (/* binding */ react_native_ytdl)
 });
 
 ;// CONCATENATED MODULE: ./node_modules/react-native-ytdl/lib/index.js
@@ -3131,8 +3131,9 @@ exports.cleanVideoDetails = (videoDetails, info) => {
 
   // Use more reliable `lengthSeconds` from `playerMicroformatRenderer`.
   videoDetails.lengthSeconds =
-    info.player_response.microformat &&
-    info.player_response.microformat.playerMicroformatRenderer.lengthSeconds;
+    (info.player_response.microformat &&
+    info.player_response.microformat.playerMicroformatRenderer.lengthSeconds) ||
+    info.player_response.videoDetails.lengthSeconds;
   return videoDetails;
 };
 
@@ -3238,6 +3239,8 @@ const BASE_URL = 'https://www.youtube.com/watch?v=';
 exports.cache = new Cache();
 exports.cookieCache = new Cache(1000 * 60 * 60 * 24);
 exports.watchPageCache = new Cache();
+// Cache for cver used in getVideoInfoPage
+let cver = '2.20210622.10.00';
 
 
 // Special error class used to determine if an error is unrecoverable,
@@ -3279,8 +3282,8 @@ exports.getBasicInfo = async(id, options) => {
     );
   };
   let info = await pipeline([id, options], validate, retryOptions, [
-    getWatchJSONPage,
     getWatchHTMLPage,
+    getWatchJSONPage,
     getVideoInfoPage,
   ]);
 
@@ -3493,7 +3496,7 @@ const getWatchJSONPage = async(id, options) => {
   let cookie = reqOptions.headers.Cookie || reqOptions.headers.cookie;
   reqOptions.headers = Object.assign({
     'x-youtube-client-name': '1',
-    'x-youtube-client-version': '2.20201203.06.00',
+    'x-youtube-client-version': cver,
     'x-youtube-identity-token': exports.cookieCache.get(cookie || 'browser') || '',
   }, reqOptions.headers);
 
@@ -3502,7 +3505,7 @@ const getWatchJSONPage = async(id, options) => {
     reqOptions.headers['x-youtube-identity-token'] = await getIdentityToken(id, options, key, throwIfNotFound);
   };
 
-  if (cookie) {
+  if (!cookie) {
     await setIdentityToken(cookie, true);
   }
 
@@ -3527,13 +3530,14 @@ const getWatchHTMLPage = async(id, options) => {
   let body = await getWatchHTMLPageBody(id, options);
   let info = { page: 'watch' };
   try {
+    cver = utils.between(body, '{"key":"cver","value":"', '"}');
     info.player_response = findJSON('watch.html', 'player_response',
-      body, /\bytInitialPlayerResponse\s*=\s*\{/i, '\n', '{');
+      body, /\bytInitialPlayerResponse\s*=\s*\{/i, '</script>', '{');
   } catch (err) {
     let args = findJSON('watch.html', 'player_response', body, /\bytplayer\.config\s*=\s*{/, '</script>', '{');
     info.player_response = findPlayerResponse('watch.html', args);
   }
-  info.response = findJSON('watch.html', 'response', body, /\bytInitialData("\])?\s*=\s*\{/i, '\n', '{');
+  info.response = findJSON('watch.html', 'response', body, /\bytInitialData("\])?\s*=\s*\{/i, '</script>', '{');
   info.html5player = getHTML5player(body);
   return info;
 };
@@ -3546,7 +3550,7 @@ const getVideoInfoPage = async(id, options) => {
   const url = new URL(`https://${INFO_HOST}${INFO_PATH}`);
   url.searchParams.set('video_id', id);
   url.searchParams.set('c', 'TVHTML5');
-  url.searchParams.set('cver', '7.20190319');
+  url.searchParams.set('cver', `7${cver.substr(1)}`);
   url.searchParams.set('eurl', VIDEO_EURL + id);
   url.searchParams.set('ps', 'default');
   url.searchParams.set('gl', 'US');
@@ -4252,7 +4256,7 @@ exports.checkForUpdates = () => {
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse("{\"_from\":\"github:benkaiser/react-native-ytdl\",\"_id\":\"react-native-ytdl@4.8.2\",\"_inBundle\":false,\"_integrity\":\"\",\"_location\":\"/react-native-ytdl\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"git\",\"raw\":\"github:benkaiser/react-native-ytdl\",\"rawSpec\":\"github:benkaiser/react-native-ytdl\",\"saveSpec\":\"github:benkaiser/react-native-ytdl\",\"fetchSpec\":null,\"gitCommittish\":null},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"github:benkaiser/react-native-ytdl#f860f6d90d063d67bcedf2cd0490304c2a375e1b\",\"_spec\":\"github:benkaiser/react-native-ytdl\",\"_where\":\"/Users/benkaiser/git/Stretto-Helper-Extension\",\"author\":{\"name\":\"Abel Tesfaye\"},\"bugs\":{\"url\":\"https://github.com/ytdl-js/react-native-ytdl/issues\"},\"bundleDependencies\":false,\"dependencies\":{\"querystring\":\"^0.2.1\",\"url\":\"~0.10.1\",\"whatwg-url-without-unicode\":\"^8.0.0-3\"},\"deprecated\":false,\"description\":\"YouTube video and audio stream extractor for react native.\",\"homepage\":\"https://github.com/ytdl-js/react-native-ytdl#readme\",\"keywords\":[\"react\",\"native\",\"youtube\",\"downloader\",\"audio\",\"video\",\"stream\",\"extractor\",\"ytdl\"],\"license\":\"ISC\",\"main\":\"index.js\",\"name\":\"react-native-ytdl\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/ytdl-js/react-native-ytdl.git\"},\"scripts\":{\"apply-patches\":\"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh\",\"clean-temp\":\"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh\",\"clone-and-patch\":\"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp\",\"clone-node-ytdl-core\":\"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh\",\"copy-to-project-root\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh\",\"copy-to-test-app\":\"./__AUTO_PATCHER__/shell_scripts/copy_patches_and_package_json_from_temp_dir_to_test_app.sh\",\"test\":\"echo \\\"Error: no test specified\\\" && exit 1\"},\"version\":\"4.8.2\"}");
+module.exports = JSON.parse('{"_from":"github:benkaiser/react-native-ytdl","_id":"react-native-ytdl@4.8.3","_inBundle":false,"_integrity":"","_location":"/react-native-ytdl","_phantomChildren":{},"_requested":{"type":"git","raw":"github:benkaiser/react-native-ytdl","rawSpec":"github:benkaiser/react-native-ytdl","saveSpec":"github:benkaiser/react-native-ytdl","fetchSpec":null,"gitCommittish":null},"_requiredBy":["#USER","/"],"_resolved":"github:benkaiser/react-native-ytdl#795fc59cafccd150615f22107debe1d562e1f38b","_spec":"github:benkaiser/react-native-ytdl","_where":"/Users/benkaiser/git/Stretto-Helper-Extension","author":{"name":"Abel Tesfaye"},"bugs":{"url":"https://github.com/ytdl-js/react-native-ytdl/issues"},"bundleDependencies":false,"dependencies":{"querystring":"^0.2.1","url":"~0.10.1","whatwg-url-without-unicode":"^8.0.0-3"},"deprecated":false,"description":"YouTube video and audio stream extractor for react native.","homepage":"https://github.com/ytdl-js/react-native-ytdl#readme","keywords":["react","native","youtube","downloader","audio","video","stream","extractor","ytdl"],"license":"ISC","main":"index.js","name":"react-native-ytdl","repository":{"type":"git","url":"git+https://github.com/ytdl-js/react-native-ytdl.git"},"scripts":{"apply-patches":"./__AUTO_PATCHER__/shell_scripts/apply_custom_implementations_to_temp_dir.sh","clean-temp":"./__AUTO_PATCHER__/shell_scripts/clean_temp_dir.sh","clone-and-patch":"npm run clone-node-ytdl-core && npm run apply-patches && npm run copy-to-project-root && npm run copy-to-test-app && npm run clean-temp","clone-node-ytdl-core":"./__AUTO_PATCHER__/shell_scripts/clone_node_ytdl_core_to_temp_dir.sh","copy-to-project-root":"./__AUTO_PATCHER__/shell_scripts/copy_patches_from_temp_dir_to_project_root.sh","copy-to-test-app":"./__AUTO_PATCHER__/shell_scripts/copy_patches_and_package_json_from_temp_dir_to_test_app.sh","test":"echo \\"Error: no test specified\\" && exit 1"},"version":"4.8.3"}');
 
 /***/ }),
 
@@ -4312,6 +4316,9 @@ const onBeforeSendHeaders = (request) => {
             if (requestHeaders[i].name.toLowerCase() === 'x-youtube-identity-token') {
                 // drop mobile user-agent detection
                 requestHeaders[i].value = requestHeaders[i].value.replace('\\u003d', '=');
+            }
+            if (requestHeaders[i].name === 'Sec-Fetch-Mode') {
+                requestHeaders[i].value = 'same-origin';
             }
         }
     }
@@ -4414,10 +4421,7 @@ const remove = () => {
 const install = () => {
     remove();
     chrome.webRequest.onBeforeSendHeaders.addListener(onBeforeSendHeaders, { urls: ['<all_urls>'] }, ['blocking', 'requestHeaders']);
-    const headersRecievedOptions = ['blocking', 'responseHeaders'];
-    if (!navigator.userAgent.includes('Android')) {
-        headersRecievedOptions.push('extraHeaders');
-    }
+    const headersRecievedOptions = ['blocking', 'responseHeaders', 'extraHeaders'];
     chrome.webRequest.onHeadersReceived.addListener(onHeadersReceived, {
         urls: ['<all_urls>']
     }, headersRecievedOptions);
@@ -4449,8 +4453,9 @@ module.exports = {
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
 /******/ 		// Check if module is in cache
-/******/ 		if(__webpack_module_cache__[moduleId]) {
-/******/ 			return __webpack_module_cache__[moduleId].exports;
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
 /******/ 		}
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = __webpack_module_cache__[moduleId] = {
@@ -4493,7 +4498,7 @@ module.exports = {
 /******/ 	
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */
 /******/ 	(() => {
-/******/ 		__webpack_require__.o = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop)
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ 	})();
 /******/ 	
 /******/ 	/* webpack/runtime/make namespace object */
@@ -4508,9 +4513,11 @@ module.exports = {
 /******/ 	})();
 /******/ 	
 /************************************************************************/
+/******/ 	
 /******/ 	// startup
-/******/ 	// Load entry module
+/******/ 	// Load entry module and return exports
 /******/ 	// This entry module is referenced by other modules so it can't be inlined
-/******/ 	__webpack_require__(136);
+/******/ 	var __webpack_exports__ = __webpack_require__(136);
+/******/ 	
 /******/ })()
 ;
