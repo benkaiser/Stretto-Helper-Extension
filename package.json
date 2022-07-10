@@ -8,6 +8,7 @@
     "start": "npm run webpack && npm run copy-yt",
     "copy-yt": "cp node_modules/ytdl-core-info-browser/dist/ytdl.min.js extension/ytdl.js",
     "create-zip": "cd extension; zip -r ../extension.zip *",
+    "push-adb": "adb push extension.zip /sdcard/Downloads/extension.zip",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Benjamin Kaiser",

@@ -33,7 +33,37 @@ function interceptRequest(initiator) {
         return true;
     }
 }
+function isThisExtension(initiator) {
+    return initiator === `chrome-extension://${chrome.runtime.id}`;
+}
 const requestOriginMap = {};
+const onBeforeSendHeaders = (request) => {
+    const requestHeaders = request.requestHeaders;
+    if (isThisExtension(request.initiator)) {
+        for (var i = 0; i < requestHeaders.length; ++i) {
+            if (requestHeaders[i].name === 'User-Agent') {
+                // drop mobile user-agent detection
+                requestHeaders[i].value = requestHeaders[i].value.replace('Android', '').replace('Mobile', '');
+            }
+            if (requestHeaders[i].name.toLowerCase() === 'x-youtube-identity-token') {
+                // drop mobile user-agent detection
+                requestHeaders[i].value = requestHeaders[i].value.replace('\\u003d', '=');
+            }
+            if (requestHeaders[i].name === 'Sec-Fetch-Mode') {
+                requestHeaders[i].value = 'same-origin';
+            }
+        }
+    }
+    else if (request.url.includes('https://www.youtube.com/') || request.url.includes('https://soundcloud.com/')) {
+        for (var i = 0; i < requestHeaders.length; ++i) {
+            if (requestHeaders[i].name === 'User-Agent') {
+                // drop mobile user-agent detection
+                requestHeaders[i].value = requestHeaders[i].value.replace('Android', '').replace('Mobile', '');
+            }
+        }
+    }
+    return { requestHeaders };
+};
 const onHeadersReceived = (request) => {
     const responseHeaders = request.responseHeaders;
     if (!interceptRequest(request.initiator)) {
@@ -117,10 +147,12 @@ const onHeadersReceived = (request) => {
     return { responseHeaders };
 };
 const remove = () => {
+    chrome.webRequest.onBeforeSendHeaders.removeListener(onBeforeSendHeaders);
     chrome.webRequest.onHeadersReceived.removeListener(onHeadersReceived);
 };
 const install = () => {
     remove();
+    chrome.webRequest.onBeforeSendHeaders.addListener(onBeforeSendHeaders, { urls: ['<all_urls>'] }, ['blocking', 'requestHeaders']);
     const headersRecievedOptions = ['blocking', 'responseHeaders', 'extraHeaders'];
     chrome.webRequest.onHeadersReceived.addListener(onHeadersReceived, {
         urls: ['<all_urls>']
