@@ -1,5 +1,4 @@
-// @ts-ignore
-import ytdl from "react-native-ytdl";
+const ytdl = window.require('ytdl-core-browser')({ proxyUrl: '' });
 
 chrome.runtime.onMessageExternal.addListener((message: any, _: any, sendResponse: (result: any) => void) => {
   if (message && message.type === 'YOUTUBE_AUDIO_FETCH') {
@@ -34,38 +33,7 @@ function interceptRequest(initiator: string) {
   }
 }
 
-function isThisExtension(initiator: string) {
-  return initiator === `chrome-extension://${chrome.runtime.id}`;
-}
-
 const requestOriginMap: { [key: number]: string | undefined } = {};
-
-const onBeforeSendHeaders = (request: any) => {
-  const requestHeaders = request.requestHeaders;
-  if (isThisExtension(request.initiator)) {
-    for (var i = 0; i < requestHeaders.length; ++i) {
-      if (requestHeaders[i].name === 'User-Agent') {
-        // drop mobile user-agent detection
-        requestHeaders[i].value = requestHeaders[i].value.replace('Android', '').replace('Mobile', '');
-      }
-      if (requestHeaders[i].name.toLowerCase() === 'x-youtube-identity-token') {
-        // drop mobile user-agent detection
-        requestHeaders[i].value = requestHeaders[i].value.replace('\\u003d', '=');
-      }
-      if (requestHeaders[i].name === 'Sec-Fetch-Mode') {
-        requestHeaders[i].value = 'same-origin';
-      }
-    }
-  } else if (request.url.includes('https://www.youtube.com/') || request.url.includes('https://soundcloud.com/')) {
-    for (var i = 0; i < requestHeaders.length; ++i) {
-      if (requestHeaders[i].name === 'User-Agent') {
-        // drop mobile user-agent detection
-        requestHeaders[i].value = requestHeaders[i].value.replace('Android', '').replace('Mobile', '');
-      }
-    }
-  }
-  return { requestHeaders };
-}
 
 const onHeadersReceived = (request: any) => {
   const responseHeaders = request.responseHeaders;
@@ -151,15 +119,10 @@ const onHeadersReceived = (request: any) => {
   return { responseHeaders };
 };
 const remove = () => {
-  chrome.webRequest.onBeforeSendHeaders.removeListener(onBeforeSendHeaders);
   chrome.webRequest.onHeadersReceived.removeListener(onHeadersReceived);
 };
 const install = () => {
   remove();
-  chrome.webRequest.onBeforeSendHeaders.addListener(onBeforeSendHeaders,
-    { urls: ['<all_urls>'] },
-    ['blocking', 'requestHeaders']
-  );
   const headersRecievedOptions = ['blocking', 'responseHeaders', 'extraHeaders'];
   chrome.webRequest.onHeadersReceived.addListener(onHeadersReceived, {
     urls: ['<all_urls>']

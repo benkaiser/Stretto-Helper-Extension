@@ -14,7 +14,7 @@
        "128": "icon128.png"
     },
     "background": {
-        "scripts": ["background.js"],
+        "scripts": ["ytdl.js", "background.js"],
         "persistent": true
     },
     "externally_connectable": {
@@ -33,5 +33,6 @@
             "js": ["content.js"]
         }
     ],
+    "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
     "manifest_version": 2
   }
