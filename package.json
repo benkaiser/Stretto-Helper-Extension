@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "webpack --watch",
-    "start": "npm run webpack && npm run copy-yt",
+    "start": "webpack && npm run copy-yt",
     "copy-yt": "cp node_modules/ytdl-core-info-browser/dist/ytdl.min.js extension/ytdl.js",
     "create-zip": "cd extension; zip -r ../extension.zip *",
     "push-adb": "adb push extension.zip /sdcard/Downloads/extension.zip",
@@ -15,7 +15,7 @@
   "license": "MIT",
   "dependencies": {
     "ffmpeg.js": "^4.2.9003",
-    "ytdl-core-info-browser": "1.0.3",
+    "ytdl-core-info-browser": "benkaiser/ytdl-core-info-browser",
     "ts-loader": "^8.3.0",
     "typescript": "^4.3.5",
     "webpack": "^5.46.0",
