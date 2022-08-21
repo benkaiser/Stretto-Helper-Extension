@@ -1,5 +1,5 @@
 {
-  "name": "youtube-to-mp3",
+  "name": "stretto-helper-extension",
   "version": "1.0.0",
   "description": "Convert youtube to MP3 and upload to SkyNet",
   "main": "index.js",
