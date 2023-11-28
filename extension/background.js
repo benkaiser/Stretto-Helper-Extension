@@ -78,7 +78,13 @@ const onHeadersReceived = (request) => {
     if (prefs['overwrite-origin'] === true) {
         const o = responseHeaders.find(({ name }) => name.toLowerCase() === 'access-control-allow-origin');
         if (o) {
-            o.value = request.initiator;
+            if (o.value === '*' && requestOriginMap[request.url]) {
+                o.value = requestOriginMap[request.url];
+                delete requestOriginMap[request.url];
+            }
+            else {
+                o.value = request.initiator;
+            }
         }
         else {
             responseHeaders.push({
