@@ -1,6 +1,5 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
-var __webpack_exports__ = {};
 
 const ytdl = window.require('ytdl-core-browser')({ proxyUrl: '' });
 chrome.runtime.onMessageExternal.addListener((message, _, sendResponse) => {
@@ -29,6 +28,7 @@ const prefs = {
 function interceptRequest(initiator) {
     if (initiator &&
         (initiator.startsWith('http://localhost:3000')
+            || initiator.startsWith('http://127.0.0.1:3000')
             || initiator.startsWith('https://next.kaiserapps.com'))) {
         return true;
     }

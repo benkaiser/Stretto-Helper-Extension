@@ -28,6 +28,7 @@ const prefs = {
 function interceptRequest(initiator: string) {
   if (initiator &&
     (initiator.startsWith('http://localhost:3000')
+    || initiator.startsWith('http://127.0.0.1:3000')
     || initiator.startsWith('https://next.kaiserapps.com'))) {
     return true;
   }

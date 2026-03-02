@@ -20,6 +20,7 @@
     "externally_connectable": {
         "matches": [
             "http://localhost/*",
+            "http://127.0.0.1/*",
             "https://next.kaiserapps.com/*"
         ]
     },
@@ -27,7 +28,8 @@
         {
             "matches": [
                 "https://next.kaiserapps.com/*",
-                "http://localhost:3000/*"
+                "http://localhost:3000/*",
+                "http://127.0.0.1:3000/*"
             ],
             "run_at": "document_start",
             "js": ["content.js"]
