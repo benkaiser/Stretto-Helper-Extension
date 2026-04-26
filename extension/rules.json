@@ -1,0 +1,59 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "Access-Control-Allow-Origin", "operation": "set", "value": "https://next.kaiserapps.com" },
+        { "header": "Access-Control-Allow-Methods", "operation": "set", "value": "GET, PUT, POST, DELETE, HEAD, OPTIONS, PATCH" },
+        { "header": "Access-Control-Allow-Credentials", "operation": "set", "value": "true" },
+        { "header": "Access-Control-Allow-Headers", "operation": "set", "value": "*" },
+        { "header": "Access-Control-Expose-Headers", "operation": "set", "value": "*" },
+        { "header": "X-Frame-Options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "initiatorDomains": ["next.kaiserapps.com"],
+      "resourceTypes": ["xmlhttprequest", "sub_frame", "media", "other"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "Access-Control-Allow-Origin", "operation": "set", "value": "http://localhost:3000" },
+        { "header": "Access-Control-Allow-Methods", "operation": "set", "value": "GET, PUT, POST, DELETE, HEAD, OPTIONS, PATCH" },
+        { "header": "Access-Control-Allow-Credentials", "operation": "set", "value": "true" },
+        { "header": "Access-Control-Allow-Headers", "operation": "set", "value": "*" },
+        { "header": "Access-Control-Expose-Headers", "operation": "set", "value": "*" },
+        { "header": "X-Frame-Options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "initiatorDomains": ["localhost"],
+      "resourceTypes": ["xmlhttprequest", "sub_frame", "media", "other"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "Access-Control-Allow-Origin", "operation": "set", "value": "http://127.0.0.1:3000" },
+        { "header": "Access-Control-Allow-Methods", "operation": "set", "value": "GET, PUT, POST, DELETE, HEAD, OPTIONS, PATCH" },
+        { "header": "Access-Control-Allow-Credentials", "operation": "set", "value": "true" },
+        { "header": "Access-Control-Allow-Headers", "operation": "set", "value": "*" },
+        { "header": "Access-Control-Expose-Headers", "operation": "set", "value": "*" },
+        { "header": "X-Frame-Options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "initiatorDomains": ["127.0.0.1"],
+      "resourceTypes": ["xmlhttprequest", "sub_frame", "media", "other"]
+    }
+  }
+]

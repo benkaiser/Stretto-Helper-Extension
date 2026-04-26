@@ -1,40 +1,50 @@
 {
-    "name": "Stretto Helper",
-    "version": "1.0",
-    "permissions": [
-        "background",
-        "webRequest",
-        "webRequestBlocking",
-        "<all_urls>",
-        "*://*.youtube.com/*"
-    ],
-    "icons": {
-        "16": "icon16.png",
-        "48": "icon48.png",
-       "128": "icon128.png"
-    },
-    "background": {
-        "scripts": ["ytdl.js", "background.js"],
-        "persistent": true
-    },
-    "externally_connectable": {
-        "matches": [
-            "http://localhost/*",
-            "http://127.0.0.1/*",
-            "https://next.kaiserapps.com/*"
-        ]
-    },
-    "content_scripts": [
-        {
-            "matches": [
-                "https://next.kaiserapps.com/*",
-                "http://localhost:3000/*",
-                "http://127.0.0.1:3000/*"
-            ],
-            "run_at": "document_start",
-            "js": ["content.js"]
-        }
-    ],
-    "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
-    "manifest_version": 2
-  }
+  "name": "Stretto Helper",
+  "version": "2.0",
+  "manifest_version": 3,
+  "permissions": [
+    "declarativeNetRequest"
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "cors_rules",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "externally_connectable": {
+    "matches": [
+      "http://localhost/*",
+      "http://127.0.0.1/*",
+      "https://next.kaiserapps.com/*"
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": [
+        "https://next.kaiserapps.com/*",
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://next.kaiserapps.com/*",
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ],
+      "run_at": "document_start",
+      "js": ["content.js"]
+    }
+  ]
+}

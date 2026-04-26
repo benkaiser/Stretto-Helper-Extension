@@ -1,9 +1,7 @@
 const path = require('path');
-const webpack = require('webpack');
 
 module.exports = {
   entry: {
-    background: './src/background.ts',
     content: './src/content.ts',
   },
   module: {
@@ -15,11 +13,6 @@ module.exports = {
       },
     ],
   },
-  plugins: [
-    new webpack.ProvidePlugin({
-      process: path.resolve(path.join(__dirname, 'src/processMock'))
-    })
-  ],
   resolve: {
     extensions: [ '.tsx', '.ts', '.js' ],
   },

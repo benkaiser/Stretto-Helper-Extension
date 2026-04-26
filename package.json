@@ -1,27 +1,20 @@
 {
   "name": "stretto-helper-extension",
-  "version": "1.0.0",
-  "description": "Convert youtube to MP3 and upload to SkyNet",
+  "version": "2.0.0",
+  "description": "CORS helper extension for Stretto music player",
   "main": "index.js",
   "scripts": {
     "dev": "webpack --watch",
-    "start": "webpack && npm run copy-yt",
-    "copy-yt": "cp node_modules/ytdl-core-info-browser/dist/ytdl.min.js extension/ytdl.js",
-    "create-zip": "cd extension; zip -r ../extension.zip *",
-    "push-adb": "adb push extension.zip /sdcard/Downloads/extension.zip",
+    "start": "webpack",
+    "create-zip": "cd extension; zip -r ../extension.zip * -x '_metadata/*' '.DS_Store'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Benjamin Kaiser",
   "license": "MIT",
   "dependencies": {
-    "ffmpeg.js": "^4.2.9003",
-    "ytdl-core-info-browser": "benkaiser/ytdl-core-info-browser",
     "ts-loader": "^8.3.0",
     "typescript": "^4.3.5",
     "webpack": "^5.46.0",
     "webpack-cli": "^4.7.2"
-  },
-  "devDependencies": {
-    "script-loader": "^0.7.2"
   }
 }
